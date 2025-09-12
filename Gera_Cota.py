@@ -233,11 +233,11 @@ def gerar_cotas_thread():
                         # Códigos que devemos procurar na coluna L
                         codigos_procurados = [
                             "17.1 CORRIMÃO", "17.1 ESCUDO", "17.1 PIQUETE", "17.1 BICICLETÁRIO",
-                            "17.3 PAREDE", "17.6 PAREDE", "17.6 RODAPÉ", "17.6 PILAR", "17.6 MURETA",
-                            "17.6 MURO", "17.6 MARQUISE", "17.6 FORRO", "17.7 PORTA", "17.8 VAGAS",
-                            "17.8 TÁTIL", "17.9 LETREIRO", "17.9 TOTEM", "17.9 LIXEIRA", "17.11 PAREDE",
-                            "17.11 RODAPÉ", "17.11 PILAR", "17.11 MURETA", "17.11  MURO", "17.11 MARQUISE",
-                            "17.11  FORRO"
+                            "17.3 PAREDE", "17.4 PAREDE", "17.4 MARQUISE", "17.4 FORRO", "17.6 PAREDE",
+                            "17.6 RODAPÉ", "17.6 PILAR", "17.6 MURETA", "17.6 MURO", "17.6 MARQUISE",
+                            "17.6 FORRO", "17.7 PORTA", "17.8 VAGAS", "17.8 TÁTIL", "17.9 LETREIRO",
+                            "17.9 TOTEM", "17.9 LIXEIRA", "17.11 PAREDE", "17.11 RODAPÉ", "17.11 PILAR",
+                            "17.11 MURETA", "17.11  MURO", "17.11 MARQUISE", "17.11  FORRO"
                         ]
                         modelo_RF = "Demais_RFs"
                         coluna_codigo = "L"
