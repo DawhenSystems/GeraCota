@@ -473,11 +473,11 @@ def gerar_seta_e_texto(sht, linha_p, comprimento, altura, largura, modelo_RF):
         celula_s = sht.range(f"S{linha_destino}")
         print(f"Posicionando setas na célula S{linha_destino} (linha do código P{linha_p} + 6)")
     else:
-        # Calcular a linha onde as setas serão posicionadas: linha do código + 5
-        linha_destino = linha_p + 5
+        # Calcular a linha onde as setas serão posicionadas: linha do código + 2
+        linha_destino = linha_p + 2
         celula_s = sht.range(f"P{linha_destino}")
-        print(f"Posicionando setas na célula P{linha_destino} (linha do código L{linha_p} + 5)")
-    
+        print(f"Posicionando setas na célula P{linha_destino} (linha do código L{linha_p} + 2)")
+
     # Obter as coordenadas da célula em pixels
     posicao_x = celula_s.left
     posicao_y = celula_s.top
@@ -502,7 +502,7 @@ def gerar_seta_e_texto(sht, linha_p, comprimento, altura, largura, modelo_RF):
                 posicao_x + 10,
                 posicao_y,
                 posicao_x + 10,
-                posicao_y + 60
+                posicao_y + 80
             )
             arrow_vertical.Name = "Cota_Arrow_Vertical"  # Nome para identificação
             arrow_vertical.Line.EndArrowheadStyle = 2
@@ -514,9 +514,9 @@ def gerar_seta_e_texto(sht, linha_p, comprimento, altura, largura, modelo_RF):
             text_v = sht.api.Shapes.AddTextbox(
                 1,
                 posicao_x + 15,
-                posicao_y + 20,
-                50,
-                20
+                posicao_y + 30,
+                60,
+                30
             )
             text_v.Name = "Cota_Text_Vertical"  # Nome para identificação
             text_v.TextFrame2.TextRange.Text = f"{altura}m"
@@ -548,7 +548,7 @@ def gerar_seta_e_texto(sht, linha_p, comprimento, altura, largura, modelo_RF):
             arrow_horizontal = sht.api.Shapes.AddLine(
                 posicao_x,
                 posicao_y + offset_vertical,
-                posicao_x + 100,
+                posicao_x + 120,
                 posicao_y + offset_vertical
             )
             arrow_horizontal.Name = "Cota_Arrow_Horizontal"  # Nome para identificação
@@ -560,10 +560,10 @@ def gerar_seta_e_texto(sht, linha_p, comprimento, altura, largura, modelo_RF):
             # Adicionando o texto do comprimento abaixo da seta horizontal
             text_h = sht.api.Shapes.AddTextbox(
                 1,
-                posicao_x + 25,
+                posicao_x + 35,
                 posicao_y + offset_vertical + 5, # 5 pixels abaixo da seta
                 60,
-                20
+                30
             )
             text_h.Name = "Cota_Text_Horizontal"  # Nome para identificação
             text_h.TextFrame2.TextRange.Text = f"{comprimento}m"
@@ -600,7 +600,7 @@ def gerar_seta_e_texto(sht, linha_p, comprimento, altura, largura, modelo_RF):
                 posicao_x + offset_horizontal,
                 posicao_y + offset_vertical,
                 posicao_x + offset_horizontal,
-                posicao_y + offset_vertical + 60
+                posicao_y + offset_vertical + 80
             )
             arrow_largura.Name = "Cota_Arrow_Largura_Seta_Vertical"  # Nome para identificação
             arrow_largura.Line.EndArrowheadStyle = 2
@@ -612,9 +612,9 @@ def gerar_seta_e_texto(sht, linha_p, comprimento, altura, largura, modelo_RF):
             text_l = sht.api.Shapes.AddTextbox(
                 1,
                 posicao_x + offset_horizontal + 10,  # 10 pixels à direita da seta
-                posicao_y + offset_vertical + 20,  # Centralizado verticalmente
+                posicao_y + offset_vertical + 30,  # Centralizado verticalmente
                 60,
-                20
+                30
             )
             text_l.Name = "Cota_Text_Largura"  # Nome para identificação
             text_l.TextFrame2.TextRange.Text = f"{largura}m"
