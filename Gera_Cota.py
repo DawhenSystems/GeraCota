@@ -17,6 +17,62 @@ ESPESSURA_LINHA = 1.5
 TAMANHO_FONTE = 10
 LINHA_MAX_FALLBACK = 2000
 
+# Configurações por aba do Excel.
+# Cada chave é o nome exato da aba. Para adicionar suporte a uma nova aba,
+# basta incluir uma nova entrada aqui — sem alterar o código de processamento.
+#
+# Campos obrigatórios:
+#   modelo_RF     — controla o posicionamento das setas ("RJ/NI" ou "Demais_RFs")
+#   coluna_codigo — coluna onde os códigos de item são buscados (ex: "P", "L")
+#   coluna_dados  — coluna onde os valores de medida estão (ex: "O", "K")
+#   offset_comp   — quantas linhas abaixo do código está o comprimento
+#   offset_alt    — quantas linhas abaixo do código está a altura
+#   offset_larg   — quantas linhas abaixo do código está a largura (None = não existe)
+#   codigos       — lista de códigos que disparam a geração de cota nessa aba
+CONFIGURACOES_ABAS = {
+    "RELATORIO": {
+        "modelo_RF": "RJ/NI",
+        "coluna_codigo": "P",
+        "coluna_dados": "O",
+        "offset_comp": 2,   # comprimento em O(n+2)
+        "offset_alt": 3,    # altura em O(n+3)
+        "offset_larg": 5,   # largura em O(n+5)
+        "codigos": ["17.1", "17.3", "17.4", "17.6", "17.7", "17.8", "17.10", "17.11", "29.2", "29.7"],
+    },
+    "RELATÓRIO GERAL": {
+        "modelo_RF": "Demais_RFs",
+        "coluna_codigo": "L",
+        "coluna_dados": "K",
+        "offset_comp": 3,    # valor inicial; sobrescrito pela detecção automática
+        "offset_alt": 4,     # valor inicial; sobrescrito pela detecção automática
+        "offset_larg": None, # largura não existe nesse modelo
+        # Pares (offset_comp, offset_alt) testados em ordem até um produzir valor numérico.
+        # Layout 3/4: comprimento em K(n+3), altura em K(n+4)
+        # Layout 1/2: comprimento em K(n+1), altura em K(n+2)
+        "offset_candidatos": [(3, 4), (1, 2)],
+        "codigos": [
+            "17.1 CORRIMÃO", "17.1 ESCUDO", "17.1 PIQUETE", "17.1 BICICLETÁRIO",
+            "17.3 PAREDE", "17.4 PAREDE", "17.4 MARQUISE", "17.4 FORRO", "17.6 PAREDE",
+            "17.6 RODAPÉ", "17.6 PILAR", "17.6 MURETA", "17.6 MURO", "17.6 MARQUISE",
+            "17.6 FORRO", "17.7 PORTA", "17.8 VAGAS", "17.8 TÁTIL", "17.9 LETREIRO",
+            "17.9 TOTEM", "17.9 LIXEIRA", "17.11 PAREDE", "17.11 RODAPÉ", "17.11 PILAR",
+            "17.11 MURETA", "17.11  MURO", "17.11 MARQUISE", "17.11  FORRO", "29.7"
+        ],
+    },
+}
+
+# Configuração usada quando a aba encontrada não tem entrada em CONFIGURACOES_ABAS.
+# Espelha o layout da aba RELATORIO com coluna de dados ajustada para S.
+CONFIGURACAO_PADRAO = {
+    "modelo_RF": "RJ/NI",
+    "coluna_codigo": "P",
+    "coluna_dados": "S",
+    "offset_comp": 2,
+    "offset_alt": 3,
+    "offset_larg": None,
+    "codigos": ["17.1", "17.3", "17.4", "17.6", "17.7", "17.8", "17.10", "17.11", "29.2", "29.7"],
+}
+
 # Configuração inicial do tema do CustomTkinter
 ctk.set_appearance_mode("System")
 ctk.set_default_color_theme("blue")
@@ -24,6 +80,7 @@ ctk.set_default_color_theme("blue")
 # Variáveis globais para threading e logging
 log_queue = queue.Queue()
 debug_text_widget = None
+stop_event = threading.Event()  # sinaliza para a thread interromper o processamento
 
 class DebugCapture:
     """Classe para capturar prints e redirecionar para a interface"""
@@ -147,6 +204,44 @@ def obter_ultima_linha_area_impressao(sht):
         print(f"\n{traceback.format_exc()}")
         return LINHA_MAX_FALLBACK
 
+def detectar_offsets(sht, coluna_codigo, coluna_dados, codigos, ultima_linha, candidatos):
+    """
+    Detecta automaticamente qual par (offset_comp, offset_alt) está em uso na planilha.
+
+    Estratégia: encontra o primeiro código reconhecido e testa cada candidato
+    verificando se a célula de dados no offset correspondente contém um valor numérico.
+    O primeiro candidato que produzir um número válido é retornado.
+
+    Retorna (offset_comp, offset_alt) se detectado, ou None se:
+      - Nenhum código for encontrado na planilha, ou
+      - Nenhum candidato produzir valor numérico (layout desconhecido).
+    """
+    for linha in range(4, ultima_linha + 1):
+        valor = sht.range(f"{coluna_codigo}{linha}").value
+        if not valor or str(valor).strip().upper() not in codigos:
+            continue
+
+        print(f"Detectando offsets a partir do código '{str(valor).strip()}' na linha {linha}...")
+        for offset_comp, offset_alt in candidatos:
+            for offset in (offset_comp, offset_alt):
+                cell_val = sht.range(f"{coluna_dados}{linha + offset}").value
+                try:
+                    if cell_val is not None:
+                        float(cell_val)
+                        print(f"Layout detectado: offset_comp={offset_comp}, offset_alt={offset_alt} "
+                              f"(valor numérico em {coluna_dados}{linha + offset})")
+                        return offset_comp, offset_alt
+                except (ValueError, TypeError):
+                    continue
+
+        print(f"Código encontrado na linha {linha}, mas nenhum candidato produziu valor numérico. "
+              f"Layout não determinado.")
+        return None
+
+    print("Nenhum código reconhecido encontrado na planilha. Não foi possível detectar o layout.")
+    return None
+
+
 def _fechar_e_reabrir(wb, app_excel, caminho, salvar=True):
     """Fecha (e opcionalmente salva) o workbook e o reabre na mesma instância do Excel"""
     if wb is not None:
@@ -218,43 +313,40 @@ def gerar_cotas_thread():
 
                     cotas_geradas = 0
 
-                    if aba_relatorio == "RELATORIO":
-                        codigos_procurados = ["17.1", "17.3", "17.4", "17.6", "17.7", "17.8", "17.10", "17.11", "29.2", "29.7"]
-                        modelo_RF = "RJ/NI"
-                        coluna_codigo = "P"
-                        coluna_dados = "O"
-                        offset_comp = 2
-                        offset_alt = 3
-                        offset_larg = 5
-                        print(f"Configuração: RELATORIO, modelo {modelo_RF} - Códigos na coluna P, dados na coluna S")
-                    elif aba_relatorio == "RELATÓRIO GERAL":
-                        codigos_procurados = [
-                            "17.1 CORRIMÃO", "17.1 ESCUDO", "17.1 PIQUETE", "17.1 BICICLETÁRIO",
-                            "17.3 PAREDE", "17.4 PAREDE", "17.4 MARQUISE", "17.4 FORRO", "17.6 PAREDE",
-                            "17.6 RODAPÉ", "17.6 PILAR", "17.6 MURETA", "17.6 MURO", "17.6 MARQUISE",
-                            "17.6 FORRO", "17.7 PORTA", "17.8 VAGAS", "17.8 TÁTIL", "17.9 LETREIRO",
-                            "17.9 TOTEM", "17.9 LIXEIRA", "17.11 PAREDE", "17.11 RODAPÉ", "17.11 PILAR",
-                            "17.11 MURETA", "17.11  MURO", "17.11 MARQUISE", "17.11  FORRO"
-                        ]
-                        modelo_RF = "Demais_RFs"
-                        coluna_codigo = "L"
-                        coluna_dados = "K"
-                        offset_comp = 3
-                        offset_alt = 4
-                        offset_larg = None
-                        print(f"Configuração: RELATÓRIO GERAL, modelo {modelo_RF} - Códigos na coluna L, dados na coluna K")
-                    else:
-                        # Configuração padrão para abas não reconhecidas (espelhada em RELATORIO)
-                        codigos_procurados = ["17.1", "17.3", "17.4", "17.6", "17.7", "17.8", "17.10", "17.11", "29.2", "29.7"]
-                        modelo_RF = "RJ/NI"
-                        coluna_codigo = "P"
-                        coluna_dados = "S"
-                        offset_comp = 2
-                        offset_alt = 3
-                        offset_larg = None
-                        print(f"Configuração padrão para aba '{aba_relatorio}' - Códigos na coluna P, dados na coluna S")
+                    cfg = CONFIGURACOES_ABAS.get(aba_relatorio, CONFIGURACAO_PADRAO)
+                    modelo_RF = cfg["modelo_RF"]
+                    coluna_codigo = cfg["coluna_codigo"]
+                    coluna_dados = cfg["coluna_dados"]
+                    offset_comp = cfg["offset_comp"]
+                    offset_alt = cfg["offset_alt"]
+                    offset_larg = cfg["offset_larg"]
+
+                    if "offset_candidatos" in cfg:
+                        resultado = detectar_offsets(
+                            sht, coluna_codigo, coluna_dados,
+                            cfg["codigos"], ultima_linha, cfg["offset_candidatos"]
+                        )
+                        if resultado is None:
+                            app.after(0, lambda: status_label.configure(
+                                text="Erro: não foi possível detectar o layout da planilha. "
+                                     "Verifique o log para mais detalhes.",
+                                text_color="red"
+                            ))
+                            return
+                        offset_comp, offset_alt = resultado
+                    codigos_procurados = cfg["codigos"]
+                    print(f"Configuração carregada para aba '{aba_relatorio}': modelo={modelo_RF}, "
+                          f"código={coluna_codigo}, dados={coluna_dados}")
 
                     for linha_atual in range(4, ultima_linha + 1):
+                        if stop_event.is_set():
+                            print("Processamento interrompido pelo usuário.")
+                            app.after(0, lambda: status_label.configure(
+                                text=f"Interrompido. {cotas_geradas} cota(s) gerada(s) até o momento.",
+                                text_color="orange"
+                            ))
+                            break
+
                         if linha_atual % 100 == 0:
                             print(f"Processando linha {linha_atual} de {ultima_linha}")
 
@@ -383,13 +475,23 @@ def gerar_cotas_thread():
     finally:
         sys.stdout = original_stdout
         app.after(0, lambda: btn_gerar_cotas.configure(state="normal", text="Gerar Cotas"))
+        app.after(0, lambda: btn_parar_cotas.configure(state="disabled"))
+
+def parar_cotas():
+    """Sinaliza para a thread de processamento que deve parar"""
+    stop_event.set()
+    btn_parar_cotas.configure(state="disabled", text="Parando...")
+    print("Sinal de parada enviado. Aguardando fim da iteração atual...")
 
 def gerar_cotas():
     """Função chamada pelo botão - inicia o processamento em thread separada"""
+    stop_event.clear()
+
     debug_text_widget.pack(pady=10, padx=20, fill="both", expand=True)
     debug_text_widget.delete("1.0", "end")
 
     btn_gerar_cotas.configure(state="disabled", text="Processando...")
+    btn_parar_cotas.configure(state="normal", text="Parar")
 
     thread = threading.Thread(target=gerar_cotas_thread, daemon=True)
     thread.start()
@@ -572,6 +674,9 @@ btn_selecionar_arquivo.pack(pady=10)
 
 btn_gerar_cotas = ctk.CTkButton(app, text="Gerar Cotas", command=gerar_cotas)
 btn_gerar_cotas.pack(pady=15)
+
+btn_parar_cotas = ctk.CTkButton(app, text="Parar", command=parar_cotas, state="disabled", fg_color="red", hover_color="darkred")
+btn_parar_cotas.pack(pady=(0, 10))
 
 status_label = ctk.CTkLabel(app, text="", font=("Arial", 12))
 status_label.pack(pady=5)
