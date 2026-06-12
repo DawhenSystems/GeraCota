@@ -3,6 +3,7 @@ import customtkinter as ctk
 from tkinter import filedialog
 import xlwings as xw
 import os
+import datetime
 import threading
 import queue
 import sys
@@ -136,8 +137,8 @@ def update_debug_display():
 def selecionar_arquivo():
     caminho_arquivo = filedialog.askopenfilename(
         filetypes=[
-            ("Arquivos Excel", "*.xlsx"),
             ("Arquivos Excel com Macro", "*.xlsm"),
+            ("Arquivos Excel", "*.xlsx"),
             ("Todos os arquivos", "*.*")
         ]
     )
@@ -684,7 +685,7 @@ status_label.pack(pady=5)
 debug_text_widget = ctk.CTkTextbox(app, height=200, width=550, font=("Arial", 11), state="normal")
 debug_text_widget.pack_forget()
 
-rodape = ctk.CTkLabel(app, text="Dawhen © 2025 - Todos os direitos reservados", font=("Arial", 10))
+rodape = ctk.CTkLabel(app, text=f"Dawhen © {datetime.date.today().year} - Todos os direitos reservados", font=("Arial", 10))
 rodape.pack(side="bottom", pady=15)
 
 update_debug_display()
